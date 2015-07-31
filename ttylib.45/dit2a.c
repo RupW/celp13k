@@ -1,0 +1,729 @@
+/**********************************************************************
+Each of the companies; Qualcomm, and Lucent (hereinafter 
+referred to individually as "Source" or collectively as "Sources") do 
+hereby state:
+
+To the extent to which the Source(s) may legally and freely do so, the 
+Source(s), upon submission of a Contribution, grant(s) a free, 
+irrevocable, non-exclusive, license to the Third Generation Partnership 
+Project 2 (3GPP2) and its Organizational Partners: ARIB, CCSA, TIA, TTA, 
+and TTC, under the Source's copyright or copyright license rights in the 
+Contribution, to, in whole or in part, copy, make derivative works, 
+perform, display and distribute the Contribution and derivative works 
+thereof consistent with 3GPP2's and each Organizational Partner's 
+policies and procedures, with the right to (i) sublicense the foregoing 
+rights consistent with 3GPP2's and each Organizational Partner's  policies 
+and procedures and (ii) copyright and sell, if applicable) in 3GPP2's name 
+or each Organizational Partner's name any 3GPP2 or transposed Publication 
+even though this Publication may contain the Contribution or a derivative 
+work thereof.  The Contribution shall disclose any known limitations on 
+the Source's rights to license as herein provided.
+
+When a Contribution is submitted by the Source(s) to assist the 
+formulating groups of 3GPP2 or any of its Organizational Partners, it 
+is proposed to the Committee as a basis for discussion and is not to 
+be construed as a binding proposal on the Source(s).  The Source(s) 
+specifically reserve(s) the right to amend or modify the material 
+contained in the Contribution. Nothing contained in the Contribution 
+shall, except as herein expressly provided, be construed as conferring 
+by implication, estoppel or otherwise, any license or right under (i) 
+any existing or later issuing patent, whether or not the use of 
+information in the document necessarily employs an invention of any 
+existing or later issued patent, (ii) any copyright, (iii) any 
+trademark, or (iv) any other intellectual property right.
+
+With respect to the Software necessary for the practice of any or 
+all Normative portions of the QCELP-13 Variable Rate Speech Codec as 
+it exists on the date of submittal of this form, should the QCELP-13 be 
+approved as a Specification or Report by 3GPP2, or as a transposed 
+Standard by any of the 3GPP2's Organizational Partners, the Source(s) 
+state(s) that a worldwide license to reproduce, use and distribute the 
+Software, the license rights to which are held by the Source(s), will 
+be made available to applicants under terms and conditions that are 
+reasonable and non-discriminatory, which may include monetary compensation, 
+and only to the extent necessary for the practice of any or all of the 
+Normative portions of the QCELP-13 or the field of use of practice of the 
+QCELP-13 Specification, Report, or Standard.  The statement contained above 
+is irrevocable and shall be binding upon the Source(s).  In the event 
+the rights of the Source(s) in and to copyright or copyright license 
+rights subject to such commitment are assigned or transferred, the 
+Source(s) shall notify the assignee or transferee of the existence of 
+such commitments.
+*******************************************************************/
+
+/***************************** classify.c ***********************************
+This program accepts a file of block-demod decisions and does a character
+level template matching to try to decode the file.
+****************************************************************************/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include "tty.h"
+#include "tty_dbg.h"
+#include "ops.h"
+
+#define DEBUG_LEVEL     4    /* 0=OFF, -1=ALL ON, or [1-5] */
+#define DEBUG(n,x)      if( (n <= DEBUG_LEVEL || DEBUG_LEVEL < 0) && tty_debug_print_flag) {x}
+
+#define DEBUG_FRAMING_LEVEL     0   /* 0=OFF, -1=ALL ON, or [1-5] */
+#define DEBUG_FRAMING(n,x)      if( (n <= DEBUG_FRAMING_LEVEL || DEBUG_FRAMING_LEVEL < 0) && tty_debug_print_flag) {x}
+
+#define DEBUG_TTYSTATE_LEVEL    0   /* 0=OFF, -1=ALL ON, or [1-5] */
+#define DEBUG_TTYSTATE(n,x)     if( (n <= DEBUG_TTYSTATE_LEVEL || DEBUG_TTYSTATE_LEVEL < 0) && tty_debug_print_flag) {x}
+
+#define MIN_TTY_ONSET_FRAMES    4
+
+#define BOOL int
+#define TRUE 1
+#define FALSE 0
+#define SUCCESS 1
+#define FAILURE 0
+
+
+
+/* definitions for the buffer */
+/* The buffer contains enough detector outputs (DITs) to contain a whole
+   character + 2 bits on the left (oldest) and 1 bit on the right
+   for framing purposes (11 bits in all) */
+
+#define DATA_BITS       5
+
+#define BIT_LEN         11                      /* # dits in a TTY bit */
+#define HALF_BIT_LEN    (BIT_LEN >> 1)
+#define START_DITS      BIT_LEN
+#define DATA_DITS       (DATA_BITS*BIT_LEN)
+#define STOP_DITS       (2*BIT_LEN)
+#define MIN_STOP_DITS   (BIT_LEN+HALF_BIT_LEN)
+#define MEM_DITS        MIN_STOP_DITS
+#define CHAR_LEN        (START_DITS+DATA_DITS+STOP_DITS)
+#define MIN_CHAR_LEN    (START_DITS+DATA_DITS+MIN_STOP_DITS)
+
+
+#define BUF_LEN         (CHAR_LEN + MEM_DITS)
+#define MIN_BUF_LEN     (MIN_CHAR_LEN + MEM_DITS)
+#define MEMORY_BIT_IDX  0
+#define START_BIT_IDX   (MEM_DITS + MEMORY_BIT_IDX)
+#define DATA_IDX        (START_DITS + START_BIT_IDX)
+#define STOP_BIT_IDX    (DATA_DITS + DATA_IDX)
+
+#define DITBUF_LEN  DITS_PER_FRAME+BUF_LEN-1
+
+
+/* Hangover */
+#define FRAMING_HANGOVER    12                  /* # of frames from the start
+                                                *  of framing a character 
+                                                *  to still output that  
+                                                *  character's info
+                                                */
+
+/* definitions of decision thresholds */
+#if PASS_TONES
+#    define TTY_ONSET_WINDOW_LEN    (2*BIT_LEN+HALF_BIT_LEN)
+#else
+#    define TTY_ONSET_WINDOW_LEN    (BIT_LEN+HALF_BIT_LEN)
+#endif
+
+#define TTY_ONSET_THRESH        (BIT_LEN-4)               /* # of good detections */
+#define TTY_THRESH              (MIN_CHAR_LEN-8)          /* # of good detections */
+#define MEM_THRESH              8   /*11*/
+#define START_THRESH            7
+#define DATA_THRESH             7
+#define STOP_THRESH             7  /*11*/
+#define SILENCE_THRESH          7
+
+/* function prototypes */
+
+void FlushBuffer(int *inbuf,int bufLen,int fillValue);
+void GetTtyState(short *ttyState,short *first_tty_detection,short *inbuf,short len );
+int GetOnsetState(short *inbuf,int startIdx,int bufLen,int threshold);
+int GetFramingState(short *tty_char, short *inbuf);
+
+int     framingCount;
+short   ttyState;
+int     d2aInbuf[BUF_LEN];
+short   last_tty_char;
+short   last_char_counter;
+short   first_tty_detection;
+
+unsigned long   dit2a_char_count = 0;   /* for debugging only */
+
+/*********************************************************************
+*   init_dit_to_ascii()
+**********************************************************************/
+
+void init_dit_to_ascii()
+{
+	/* initialize stuff */
+
+    ttyState = NON_TTY_MODE;
+    framingCount = -MIN_TTY_ONSET_FRAMES;
+    last_tty_char = -1;
+    last_char_counter = TTY_COUNTER_STOP;
+    first_tty_detection = 0;
+
+    FlushBuffer(d2aInbuf,BUF_LEN,UNKNOWN);
+} 
+	
+/*********************************************************************
+*   dit_to_ascii()
+**********************************************************************/
+
+void dit_to_ascii(
+    short   *tty_char,      /* (i/o): prev/new character decision   */
+    short   *char_counter,  /* (i/o): prev/new character counter    */
+    short   ditInbuf[])     /* (i): dits for current frame          */
+{
+    
+    short   dit;
+    short   tmp_ditbuf[DITBUF_LEN];
+    short   *p_tmp_ditbuf;
+    short   i;
+
+
+    p_tmp_ditbuf = tmp_ditbuf;                              OP_COUNT(MEM_INIT);
+
+    /* Copy old dits and new dits into a single array */
+    for( i=0 ; i < BUF_LEN-1 ; i++ )
+    {
+        tmp_ditbuf[i] = d2aInbuf[i+1];                      OP_COUNT(ARRAY_STORE);
+    }
+
+    for( i=0 ; i < DITS_PER_FRAME ; i++ )
+    {
+        tmp_ditbuf[BUF_LEN-1+i] = ditInbuf[i];              OP_COUNT(ARRAY_STORE);
+    }
+
+    /* If not in the middle of a character, check ttyState */
+
+    DEBUG(4,fprintf(stdout,"framingCount = %d\n",framingCount);)
+                                                            OP_COUNT(CONDITIONAL+SUB);
+    if( ttyState != TTY_MODE_FRAMED )            
+    {
+
+            if( first_tty_detection == 0 )
+            {
+                i = 2*BIT_LEN+HALF_BIT_LEN+1;
+            }
+            else
+            {
+                i = BIT_LEN+HALF_BIT_LEN+1;
+            }
+
+            GetTtyState( &ttyState,
+                         &first_tty_detection,
+                         tmp_ditbuf,
+                         i );
+        
+    }
+
+    DEBUG(2,fprintf(stdout,"ttyState = %d\n",
+                    ttyState);
+         )
+
+    /*------------------------------------------------------------------
+    * Attempt to Frame a TTY Character
+    *------------------------------------------------------------------*/
+                                                            OP_COUNT(CONDITIONAL+2*SUB);
+    if( ttyState == TTY_MODE_FRAMED || ttyState == TTY_MODE_NOT_FRAMED )
+    {
+
+      for( dit=0 ; dit < DITS_PER_FRAME ; dit++, p_tmp_ditbuf++ )
+      {
+
+
+        /* if framed, don't check input unless lined up on next expected
+		   character */
+
+                                                            OP_COUNT(CONDITIONAL+SUB);
+        if(ttyState == TTY_MODE_FRAMED)
+        {
+            if( framingCount > 6 )
+            {
+                                                            OP_COUNT(CONDITIONAL+SUB);
+				/* check for framing first */
+                DEBUG(5,fprintf(stdout,"Framed: calling GetFramingState(): framingCount = %d\n",
+                                framingCount);)
+
+                ttyState = GetFramingState(tty_char,p_tmp_ditbuf);
+
+                if( ttyState == TTY_MODE_NOT_FRAMED )
+                {
+                    DEBUG(5,fprintf(stdout,"dit2a: Lost framing\n");)
+
+
+                    /* Maintain ttyState=FRAMED until end of framing hangover */
+
+                    ttyState = TTY_MODE_FRAMED;             OP_COUNT(MEM_INIT);
+                                                            OP_COUNT(CONDITIONAL+SUB);
+                    if( framingCount > FRAMING_HANGOVER )
+                    {
+                        ttyState = TTY_MODE_NOT_FRAMED;     OP_COUNT(MEM_INIT);
+                    }
+				}
+				else
+                {
+                    if( framingCount > 0 )
+                    {
+                        framingCount = 0;                   OP_COUNT(MEM_INIT);
+                    }
+                    first_tty_detection = 1;                OP_COUNT(MEM_INIT);
+
+                                                            OP_COUNT(ADD+MEM_MOVE);
+                    /* Increment to next counter value (by shifting) */
+                    *char_counter = last_char_counter << 1;
+                                                            OP_COUNT(CONDITIONAL+SUB);
+                    if( (*char_counter) > TTY_COUNTER_STOP )
+                    {
+                        *char_counter = TTY_COUNTER_START;  OP_COUNT(MEM_INIT);
+                    }
+                    last_tty_char = *tty_char;              OP_COUNT(MEM_MOVE);
+                    last_char_counter = *char_counter;      OP_COUNT(MEM_MOVE);
+
+                    ++dit2a_char_count;
+                    DEBUG(1,fprintf(stdout,"dit2a: %lu: Regained NEW char, counter = %d  char = %d\n",
+                              dit2a_char_count, *char_counter,*tty_char);)
+				}
+			}
+		}
+		/* if not framed, check for framing */
+		else
+        {
+                                                            OP_COUNT(CONDITIONAL+SUB);
+			/* if still not framed, just go get next DIT */
+            DEBUG(5,fprintf(stdout,"NOT Framed: calling GetFramingState(): framingCount = %d\n",
+                            framingCount);)
+            ttyState = GetFramingState(tty_char,p_tmp_ditbuf);
+
+            /* if framed now, decode the new character, update the state */
+            if( ttyState == TTY_MODE_FRAMED )
+            {
+                if( framingCount > 0 )
+                {
+                    framingCount = 0;                   OP_COUNT(MEM_INIT);
+                }
+                first_tty_detection = 1;                OP_COUNT(MEM_INIT);
+
+                /* Increment to next counter value (by shifting) */
+                *char_counter = last_char_counter << 1;      OP_COUNT(MEM_MOVE+ADD);
+                                                            OP_COUNT(CONDITIONAL+SUB);
+                if( (*char_counter) > TTY_COUNTER_STOP )
+                {
+                    *char_counter = TTY_COUNTER_START;      OP_COUNT(MEM_INIT);
+                }
+                last_tty_char = *tty_char;                  OP_COUNT(MEM_MOVE);
+                last_char_counter = *char_counter;          OP_COUNT(MEM_MOVE);
+
+                ++dit2a_char_count;
+                DEBUG(1,
+                    fprintf(stdout,"dit2a: %lu: Regained framing,  counter = %d  char = %d\n",
+                            dit2a_char_count, *char_counter,*tty_char);
+                )
+			}
+		}
+      } /* end for(dit) */
+    } /* end if(FRAMED OR TTY_MODE) */
+
+                                                            OP_COUNT(CONDITIONAL+SUB);
+    if( ttyState == NON_TTY_MODE )
+    {
+        *char_counter = NON_TTY;                    OP_COUNT(MEM_INIT);
+        *tty_char = 0;                              OP_COUNT(MEM_INIT);
+        framingCount = -MIN_TTY_ONSET_FRAMES;       OP_COUNT(MEM_INIT);
+    }
+    else if( framingCount < 0 || ttyState == TTY_ONSET )
+    {
+        *char_counter = TTY_ONSET;                  OP_COUNT(MEM_INIT);
+        *tty_char = TTY_ONSET_CHAR;                 OP_COUNT(MEM_INIT);
+        if( framingCount < 0 )
+        {
+            framingCount++;
+        }
+    }
+    else if( ttyState == TTY_MODE_FRAMED )
+    {
+        framingCount++;
+                                                    OP_COUNT(CONDITIONAL);
+        *char_counter = last_char_counter;
+        *tty_char = last_tty_char;
+    }
+    else if( ttyState == TTY_MODE_NOT_FRAMED )
+    {
+        *char_counter = TTY_SILENCE;                OP_COUNT(MEM_INIT);
+        *tty_char = TTY_SILENCE_CHAR;               OP_COUNT(MEM_INIT);
+        framingCount = 0;                           OP_COUNT(MEM_INIT);
+    }
+
+
+    /* Update dit2abuf[] for next iteration */
+    for( i=0 ; i < BUF_LEN ; i++ )
+    {
+        d2aInbuf[i] = tmp_ditbuf[i+DITS_PER_FRAME-1];       OP_COUNT(ARRAY_STORE);
+    }
+
+} /* end dit_to_ascii() */
+
+
+
+/*********************************************************************
+*   GetTtyState()
+*
+*       First checks for TTY_ONSET by checking the number of LOGIC_0
+*       or LOGIC_1 in a row within a window that is 1 1/2 bits long.
+*       If the run exceeds a threshold, it changes the ttyState to
+*       TTY_ONSET and it begins to check a larger window,
+*       about the size of a TTY character, to see if there are enough
+*       LOGIC_0 and LOGIC_1 to even consider searching for a character.
+*       If there isn't, it stays in TTY_ONSET state.  If there is,
+*       ttyState changes to TTY_MODE.
+**********************************************************************/
+
+void GetTtyState(
+    short   *ttyState,
+    short   *first_tty_detection,
+    short   *inbuf,
+    short   onset_window_len )
+{
+	int i;
+    short counter;
+    short best_counter;
+
+
+                                                            OP_COUNT(CONDITIONAL+SUB);
+    if( *ttyState == NON_TTY_MODE || *ttyState == TTY_ONSET )
+    {
+
+        DEBUG_TTYSTATE(3,
+            for( i=DITBUF_LEN-onset_window_len ; i < DITBUF_LEN ; i++)
+            {
+                fprintf(stdout,"%2d",inbuf[i]);
+            }
+            fprintf(stdout,"\n");
+        )
+
+        /*
+        *  Check for TTY_ONSET
+        */
+
+        best_counter = 0;                                   OP_COUNT(MEM_INIT);
+        counter = 0;                                        OP_COUNT(MEM_INIT);
+        for( i=DITBUF_LEN-onset_window_len+1 ; i < DITBUF_LEN ; i++)
+        {
+                                                            OP_COUNT(CONDITIONAL+2*SUB);
+            if(inbuf[i] == LOGIC_0 && inbuf[i-1] == LOGIC_0 )        
+            {
+                counter++;                                  OP_COUNT(ADD);
+            }
+            else
+            {
+                counter = 0;                                OP_COUNT(MEM_INIT);
+            }
+            best_counter = MAX(counter,best_counter);       OP_COUNT(MAX_VAL);
+        }
+
+        DEBUG_TTYSTATE(2,
+            fprintf(stdout,"Checking TTY_ONSET: SPACE: thresh = %d  counter = %2d  window_len = %2d\n",
+                TTY_ONSET_THRESH,best_counter,onset_window_len);
+        )
+
+
+        if( *ttyState == NON_TTY_MODE && best_counter < TTY_ONSET_THRESH )
+        {
+            *ttyState = NON_TTY_MODE;                       OP_COUNT(MEM_INIT);
+            return;
+        }
+
+#if PASS_TONES
+        /* For first detection, require run of 0's and 1's to be present */
+        if( *first_tty_detection == 0 )
+        {
+            if( *ttyState == NON_TTY_MODE )
+            {
+                best_counter = 0;
+            }
+        }
+#endif
+
+        counter = 0;                                        OP_COUNT(MEM_INIT);
+        for( i=DITBUF_LEN-onset_window_len+1 ; i < DITBUF_LEN ; i++)
+        {
+                                                            OP_COUNT(CONDITIONAL+2*SUB);
+            if(inbuf[i] == LOGIC_1 && inbuf[i-1] == LOGIC_1 )        
+            {
+                counter++;                                  OP_COUNT(ADD);
+            }
+            else
+            {
+                counter = 0;                                OP_COUNT(MEM_INIT);
+            }
+            best_counter = MAX(counter,best_counter);       OP_COUNT(MAX_VAL);
+        }
+
+        DEBUG_TTYSTATE(2,
+            fprintf(stdout,"Checking TTY_ONSET: MARK:  thresh = %d  counter = %2d  window_len = %2d\n",
+                TTY_ONSET_THRESH,best_counter,onset_window_len);
+        )
+
+
+        /* if ONSET not found, stay in NON_TTY_MODE */
+                                                            OP_COUNT(CONDITIONAL+SUB);
+        if(best_counter < TTY_ONSET_THRESH )
+        {
+            *ttyState = NON_TTY_MODE;                       OP_COUNT(MEM_INIT);
+            return;
+        }
+
+        DEBUG_TTYSTATE(1,fprintf(stdout,"FOUND TTY_ONSET\n");)
+
+        *ttyState = TTY_ONSET;                              OP_COUNT(MEM_INIT);
+
+    }
+
+    /*
+    *  Check for TTY_MODE
+    */
+
+    counter = 0;                                            OP_COUNT(MEM_INIT);
+    for( i=START_BIT_IDX ; i < MIN_BUF_LEN+DITS_PER_FRAME ; i++)
+    {
+                                                            OP_COUNT(CONDITIONAL+4*SUB);
+        if(inbuf[i] == LOGIC_1 || inbuf[i] == LOGIC_0
+           || (*ttyState == TTY_MODE_NOT_FRAMED && inbuf[i] == SILENCE)
+          )
+        {
+            counter++;                                      OP_COUNT(ADD);
+        }
+    }
+
+    DEBUG_TTYSTATE(2,
+        fprintf(stdout,"Checking TTY_MODE: thresh = %d  counter = %d\n",TTY_THRESH,counter);
+    )
+                                                            OP_COUNT(CONDITIONAL+SUB);
+    if(counter >= TTY_THRESH)
+    {
+        DEBUG_TTYSTATE(1,fprintf(stdout,"FOUND TTY_MODE\n");)
+        *ttyState = TTY_MODE_NOT_FRAMED;                    OP_COUNT(MEM_INIT);
+	}
+    else if( counter < TTY_THRESH && *ttyState == TTY_MODE_NOT_FRAMED )
+    {
+        *ttyState = NON_TTY_MODE;
+    }
+}
+
+
+/*********************************************************************
+*   FlushBuffer()
+**********************************************************************/
+
+void FlushBuffer(int *inbuf,int bufLen,int fillValue)
+{
+	int i;
+	for(i=0; i<bufLen; ++i)
+    {
+        inbuf[i] = fillValue;                               OP_COUNT(MEM_INIT);
+    }
+}
+
+
+/*********************************************************************
+*   GetFramingState()
+*
+*       This routine detects the TTY characters.  It is only called
+*       when ttyState is in TTY_MODE.  It checks to make sure that
+*       the dit detections are consistent with a good character.
+*       It checks that the start bit has mostly LOGIC_0, the stop bit
+*       has mostly LOGIC_1, and the data bits have mostly one value.
+*       It also checks the 2 bits before the start bit to make sure
+*       that the start bit is not preceded by a start bit.
+**********************************************************************/
+
+int GetFramingState(
+    short   *tty_char,  /* (o): Decoded char (only valid when framed)   */
+    short   *inbuf)     /* (i): Dit buffer                              */
+{
+    int     i, j, idx;
+    int     good;
+    short   mark_counter;
+    short   space_counter;
+    short   silence_counter;
+    short   charDec;
+   
+
+    silence_counter = 0;
+
+	/* first check for disallowed conditions */
+
+    /*-----------------------------------------------
+    *  Check Memory Bits:
+    *   A framed character cannot have start bits
+    *   values preceding the character's start bit.
+    *------------------------------------------------*/
+
+    for(i=0, good=0; i< START_BIT_IDX; ++i)
+    {                                                       OP_COUNT(CONDITIONAL+SUB);
+        if(inbuf[i] != START_BIT_VAL)
+        {
+            good++;                                         OP_COUNT(ADD);
+		}
+	}
+                                                            OP_COUNT(CONDITIONAL+SUB);
+    DEBUG_FRAMING(1,
+        fprintf(stdout,"\n  dit2a: mem bit:    thresh = %2d  good = %2d\n",
+                MEM_THRESH,good);
+    )
+
+    if(good < MEM_THRESH)
+    {
+        return(TTY_MODE_NOT_FRAMED);
+	}
+
+    /*-----------------------------------------------
+    *  Check Start Bit:
+    *   A framed character cannot have silence or
+    *   stop bit values in the start bit.
+    *------------------------------------------------*/
+
+	/* start bits: check for silence, high confidence non-start val */
+    for(i=START_BIT_IDX, good=0; i<DATA_IDX; ++i)
+    {
+                                                            OP_COUNT(CONDITIONAL+SUB);
+        if(inbuf[i] == START_BIT_VAL)
+        {
+            good++;                                         OP_COUNT(ADD);
+		}
+        else if(inbuf[i] == SILENCE)
+        {
+                                                            OP_COUNT(CONDITIONAL+SUB);
+            silence_counter++;                             OP_COUNT(ADD);
+		}
+	}
+
+    DEBUG_FRAMING(1,
+        fprintf(stdout,"  dit2a: start bit:  thresh = %2d  good = %2d\n",
+                START_THRESH, good);
+    )
+                                                            OP_COUNT(CONDITIONAL+SUB);
+    if(good < START_THRESH)
+    {
+        return(TTY_MODE_NOT_FRAMED);
+	}
+	
+
+    /*-----------------------------------------------
+    *  Check Data Bits:
+    *   The data bits cannot have silence and must
+    *   many more zeros than ones (or vice versa)
+    *   when it is framed.
+    *------------------------------------------------*/
+
+	/* data bits: check for silence, exceptionally poor alignment */
+    charDec = 0;
+    for( i=0,idx=DATA_IDX; i < DATA_BITS; i++ )
+    {
+        space_counter = 0;                                  OP_COUNT(MEM_INIT);
+        mark_counter = 0;                                   OP_COUNT(MEM_INIT);
+
+		for(j=0; j<BIT_LEN; ++j,++idx)
+        {                                                   OP_COUNT(MEM_INIT);
+			if(inbuf[idx] == SILENCE)
+            {
+                silence_counter++;                          OP_COUNT(ADD);
+			}
+                                                            OP_COUNT(CONDITIONAL+SUB);
+            if( inbuf[idx] == LOGIC_0 )
+            {
+                space_counter++;                            OP_COUNT(ADD);
+            }
+            else if( inbuf[idx] == LOGIC_1 )
+            {
+                                                            OP_COUNT(CONDITIONAL+SUB);
+                mark_counter++;                             OP_COUNT(ADD);
+            }
+		}
+
+
+        DEBUG_FRAMING(1,
+            fprintf(stdout,"  dit2a: data bit %d: thresh = %2d  mark = %2d  space = %2d\n",
+                     i,DATA_THRESH, mark_counter,space_counter);
+        )
+
+                                                            OP_COUNT(CONDITIONAL+MAX_VAL+SUB);
+        if(  MAX(mark_counter,space_counter) < DATA_THRESH )
+        {
+            return(TTY_MODE_NOT_FRAMED);
+        }
+        
+                                                            OP_COUNT(CONDITIONAL+SUB);
+        if( mark_counter > space_counter )
+        {
+            charDec += 1 << i;                              OP_COUNT(ADD);
+        }
+
+	}
+
+    /*-----------------------------------------------
+    *  Check Stop Bits:
+    *   The stop bits cannot have silence and must
+    *   many more ones than zeros
+    *   when it is framed.
+    *------------------------------------------------*/
+
+	/* stop bits: check for silence, high confidence non-stop bit values */
+    for(i=STOP_BIT_IDX, good=0; i<MIN_BUF_LEN; ++i)
+    {
+                                                            OP_COUNT(CONDITIONAL+SUB);
+        if(inbuf[i] == STOP_BIT_VAL)
+        {
+            good++;                                         OP_COUNT(ADD);
+		}
+#if 0
+        else if(inbuf[i] == SILENCE)
+        {
+                                                            OP_COUNT(CONDITIONAL+SUB);
+            silence_counter++;                             OP_COUNT(ADD);
+		}
+#endif
+	}
+
+    DEBUG_FRAMING(1,
+        fprintf(stdout,"  dit2a: stop bit:   thresh = %2d  good = %2d\n",
+                STOP_THRESH, good);
+    )
+
+                                                            OP_COUNT(CONDITIONAL+SUB);
+    if(good < STOP_THRESH)
+    {
+        return(TTY_MODE_NOT_FRAMED);
+	}
+
+
+    /*-----------------------------------------------
+    *  Check Silence:
+    *   Check that the number of silence dits
+    *   are below the threshold.
+    *------------------------------------------------*/
+
+    DEBUG_FRAMING(1,
+        fprintf(stdout,"  dit2a:  silence:   thresh = %2d  evil = %2d\n",
+                SILENCE_THRESH, silence_counter);
+    )
+    if( silence_counter > SILENCE_THRESH )
+    {
+        return(TTY_MODE_NOT_FRAMED);
+    }
+
+
+	/* if all tests passed, return */
+
+    /* Wipe out dits used to detect the character */
+    for( i=0 ; i < STOP_BIT_IDX ; i++ )
+    {
+        inbuf[i] = UNKNOWN;
+    }
+
+    *tty_char = charDec;
+
+    return(TTY_MODE_FRAMED);
+}
+

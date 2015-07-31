@@ -1,0 +1,27 @@
+? dit2a.block_turbo
+? dit2a.ori
+? dit2a.1
+? tty_dec.1
+? tty_gen.1
+? diff.out
+Index: tty_dec.c
+===================================================================
+RCS file: /home/phv/CVSROOT/evrc_tia/evrc_flt/ttylib/tty_dec.c,v
+retrieving revision 1.2
+diff -r1.2 tty_dec.c
+83a84,89
+>     DEBUG(1,
+>         if( counter == TTY_EIGHTH_RATE )
+>         {
+>             fprintf(stdout,"1/8 Rate Packet\n");
+>         }
+>     )
+Index: tty_enc.c
+===================================================================
+RCS file: /home/phv/CVSROOT/evrc_tia/evrc_flt/ttylib/tty_enc.c,v
+retrieving revision 1.2
+diff -r1.2 tty_enc.c
+14c14
+< #define DEBUG_LEVEL     0   /* 0=OFF, -1=ALL ON, or [1-5] */
+---
+> #define DEBUG_LEVEL     1   /* 0=OFF, -1=ALL ON, or [1-5] */
