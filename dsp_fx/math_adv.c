@@ -241,13 +241,13 @@ Word16 sqroot(Word32 L_SqrtIn)
 	/* -------------------------- */
 
 	L_Temp0 = L_mult(swTemp, swTemp3);	/* L_Temp0 = (x/2)^4 */
-	swTemp4 = round(L_Temp0);	/* swTemp4 = (x/2)^4 */
+	swTemp4 = round_l(L_Temp0);	/* swTemp4 = (x/2)^4 */
 
 	/* determine partial 6th term */
 	/* -------------------------- */
 
 	L_Temp0 = L_msu(0L, swTemp2, swTemp3);	/* L_Temp0 = (x/2)^5 */
-	swTemp2 = round(L_Temp0);	/* swTemp2 = (x/2)^5 */
+	swTemp2 = round_l(L_Temp0);	/* swTemp2 = (x/2)^5 */
 
 	/* determine 5th term and add its contribution */
 	/* ------------------------------------------- */

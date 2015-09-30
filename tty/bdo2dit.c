@@ -161,7 +161,7 @@ void baudot_to_dit(
         accA = L_shl40(accA, pow_shift);
 
         accA = L_sat32_40(accA);
-        pow = round((Word32) accA);        
+        pow = round_l((Word32) accA);
 	
         /* Compute pow0 */
         pow0 = tty_inband_energy( p_inbuf, r_c0r, r_c0i, i );
@@ -198,7 +198,7 @@ void baudot_to_dit(
         accB = L_deposit_l(TTY_MIN_INPUT_THRESH);
 	    
         /*dump_short_value(S_get_hi(A_shl_a(accA,16)),16,pow_fp);*/
-        dump_short_value(round(L_sat32_40(L_shl40(L_sub40(accA,accB),16))),16,pow_fp);
+        dump_short_value(round_l(L_sat32_40(L_shl40(L_sub40(accA,accB),16))),16,pow_fp);
 
         if (L_sub40(accA,accB) < 0)
         {
@@ -240,7 +240,7 @@ Word16 tty_inband_energy(
   accA = L_sat32_40(accA);
 
   
-  return( round((Word32) accA) );
+  return( round_l((Word32) accA) );
   
 } /* end tty_inband_energy() */
 
@@ -274,7 +274,7 @@ Word16  tty_inband_filter(
   
   accA = L_shl40(accA, shift);  /* normalize */
   accA = L_sat32_40(accA);
-  i = round((Word32) accA);        
+  i = round_l((Word32) accA);
 
   
   

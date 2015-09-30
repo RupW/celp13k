@@ -145,18 +145,18 @@ Word16  fn1_sqroot (Word16 Input)
 	    reg16_2 = reg16_1;
 	    reg32   = L_mult(reg16_1, reg16_1);  // x^2 Q29 32bits
 	    reg32   = L_shl (reg32, 1);          // x^2 Q30 32bits
-	    reg16_1 = round (reg32);             // x^2 Q14 16bits
+	    reg16_1 = round_l (reg32);             // x^2 Q14 16bits
 	      
 	    acc40   = L_mac40(0, reg16_1, Input); // v/2*x^2 Q31 40 bits 
 	    acc40   = L_shr40(acc40, 1);          // v/2*x^2 Q30 40 bits 
 	    reg32   = (Word32)acc40;              // no need saturation
-	    reg16_1 = round (reg32);              // y = v/2*x^2 Q14 16bits
+	    reg16_1 = round_l (reg32);              // y = v/2*x^2 Q14 16bits
 
 	    reg16_1 = sub(0x6000, reg16_1);       // z = 1.5 -y Q14 16 bits
 
 	    reg32   = L_mult(reg16_2, reg16_1);   // x*z Q29 32bits
 	    reg32   = L_shl (reg32, 1);           // x*z Q30 32bits
-	    reg16_1 = round (reg32);              // x*z Q14 16bits
+	    reg16_1 = round_l (reg32);              // x*z Q14 16bits
 	  }
 	Output = reg16_1;
 

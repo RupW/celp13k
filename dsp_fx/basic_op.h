@@ -143,7 +143,7 @@ Word16 extract_h(Word32 L_var1);  /* 1 ops */
 /* Round */
 /*********/
 
-Word16 round(Word32 L_var1);      /* 1 ops */
+Word16 round_l(Word32 L_var1);      /* 1 ops */
 
 /* Normalization */
 /*****************/

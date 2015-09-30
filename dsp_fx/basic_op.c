@@ -94,7 +94,7 @@ such commitments.
  *       norm_l()
  *       norm_s()
  *       popOverflow()
- *       round()
+ *       round_l()
  *       saturate()
  *       setOverflow()
  *       shift_r()
@@ -1534,7 +1534,7 @@ Word32 L_sub(Word32 L_var1, Word32 L_var2)
 
 Word16 mac_r(Word32 L_var3, Word16 var1, Word16 var2)
         {
-	  return (round(L_mac(L_var3, var1, var2)));
+	  return (round_l(L_mac(L_var3, var1, var2)));
 	}
 
 /***************************************************************************
@@ -1597,7 +1597,7 @@ Word16 mac_r(Word32 L_var3, Word16 var1, Word16 var2)
 
 Word16 msu_r(Word32 L_var3, Word16 var1, Word16 var2)
         {
-	  return (round(L_msu(L_var3, var1, var2)));
+	  return (round_l(L_msu(L_var3, var1, var2)));
 	}
 
 /***************************************************************************
@@ -1708,7 +1708,7 @@ Word16 mult_r(Word16 var1, Word16 var2)
 	  Word16 swOut;
 	  
 	  
-	  swOut = round(L_mult(var1, var2));
+	  swOut = round_l(L_mult(var1, var2));
 	  
 #ifdef WMOPS_FX
 	  counter_fx.mult_r++;
@@ -1969,7 +1969,7 @@ int popOverflow(void)
 
 /***************************************************************************
  *
- *   FUNCTION NAME: round
+ *   FUNCTION NAME: round_l
  *
  *   PURPOSE:
  *
@@ -2007,7 +2007,7 @@ int popOverflow(void)
  *
  *************************************************************************/
 
-Word16 round(Word32 L_var1)
+Word16 round_l(Word32 L_var1)
         {
 	  Word32 L_Prod;
 	  
