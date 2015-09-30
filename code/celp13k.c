@@ -118,7 +118,7 @@ printf("\n%s: %s\n",prog, prog_desc);
 
 void print_welcome_message()
 {
-printf("
+printf("\
 \n\
 ===============================================\n\
        CDMA 13K Speech Coder TTY EDITION\n\

@@ -148,7 +148,8 @@ int event;          /* switch position (correct, erasure, modified, random) */
 int frame_cnt;      /* frame counter  */
 
 /* file pointers */
-FILE    *log_fp = stdout;
+/* was: FILE    *log_fp = stdout; */
+#define log_fp stdout
 FILE    *trans_fp = NULL;
 char    *trans_fname = NULL;
 
