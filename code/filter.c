@@ -55,7 +55,9 @@ such commitments.
 
 #include <stdio.h>
 #include <stdlib.h>
+#ifndef __APPLE__
 #include <malloc.h>
+#endif
 #include <math.h>
 #include "celp.h"
 #include "tty_dbg.h"

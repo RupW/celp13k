@@ -53,7 +53,11 @@ such commitments.
 /* lpc.c - Computes the Linear Preditive Coefficients using	*/
 /*	Durbin's recursion.					*/
 
+#ifdef __APPLE__
+#include <stdlib.h>
+#else
 #include <malloc.h>
+#endif
 #include <math.h>
 #include"celp.h"
 

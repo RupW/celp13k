@@ -90,7 +90,20 @@ typedef int    FLAG;
 typedef double FLOAT64;
 typedef float  FLOAT32;
 #else
-#error  COMPILER NOT TESTED typedef.h needs to be updated, see readme
+/*
+ * If we've got this far, we don't have a specific define above for our 
+ * compiler and platform. Try stdint.h. If this doesn't work, you'll need to 
+ * track down an implementation of stdint.h for your system or write your own
+ * compiler and platform defines above.
+ */
+#include <stdint.h>
+typedef int64_t INT64;
+typedef int32_t INT32;
+typedef int16_t INT16;
+typedef uint16_t UNS_INT16;
+/* There's no equivalents for floating point. Guess double and float. */
+typedef double FLOAT64;
+typedef float FLOAT32;
 #endif
 
 /*============================================================================*/

@@ -47,8 +47,10 @@ OBJDOS= ${SRCDOS:.c=.o}
 all: ${TARGET}
 
 
+# For some reason it's necessary to manually link tty_glob.o on my mac, even though it is
+# definitely included in libtty.a.
 ${TARGET}:$(OBJ) $(TTY_DIR)/libtty.a $(FXPTLIBS)/ops/libops.a
-	$(CC) $(CFLAGS) $(OBJ) -lm -ltty -ldsp40 -lops -o $@
+	$(CC) $(CFLAGS) $(OBJ) -lm -ltty $(TTY_DIR)/tty_glob.o -ldsp40 -lops -o $@
 
 
 ${TARGET}.lint: ${LINTFILES}

@@ -99,7 +99,20 @@ typedef long Word32;             /* 32 bit "accumulator" (L_*) */
 typedef long Word32Rom;          /* 32 bit ROM data    (L_r*)  */
 typedef double Word40;				   /* 40 bit accumulator        */
 #else
-#error  COMPILER NOT TESTED typedef.h needs to be updated, see readme
+/*
+ * If we've got this far, we don't have a specific define above for our
+ * compiler and platform. Try stdint.h, and guess there are no ROM-specific
+ * modifiers for this platform. If this doesn't work, you'll need to track down
+ * an implementation of stdint.h for your system or write your own compiler and
+ * platform defines above.
+ */
+#include <stdint.h>
+typedef int16_t Word16;
+typedef uint16_t UNS_Word16;
+typedef int16_t Word16Rom;
+typedef int32_t Word32;
+typedef int32_t Word32Rom;
+typedef double Word40;
 #endif
 
 /* global variables */
