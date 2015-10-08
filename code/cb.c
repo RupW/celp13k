@@ -52,7 +52,7 @@ such commitments.
 *******************************************************************/
 /* cb.c - perform closed-loop codebook search                         */
 
-
+#include <stdlib.h>
 #include <math.h>
 #include "celp.h"
 #include "cb.h"

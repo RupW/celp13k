@@ -53,6 +53,7 @@ such commitments.
 /* encode.c - main CELP encoder */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 #include "celp.h"
 

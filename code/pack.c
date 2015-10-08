@@ -52,7 +52,7 @@ such commitments.
 *******************************************************************/
 /* pack.c - pack various parameters into the packet */
 
-
+#include <stdlib.h>
 #include "celp.h"
 #include "pack.h"
 

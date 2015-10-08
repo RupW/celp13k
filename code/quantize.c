@@ -54,6 +54,7 @@ such commitments.
 
 /* quantize.c - quantization routines */
 
+#include <stdlib.h>
 #include <math.h>
 #include "celp.h"
 #include "quantize.h"

@@ -6,7 +6,7 @@ TTY_DIR=../tty
 FXPTLIBS=../fxptlibs
 CCINCDIR=-I$(TTY_DIR) -I$(FXPTLIBS)/ops -I../dsp_fx
 CCLIBDIR=-L$(TTY_DIR) -L$(FXPTLIBS)/ops -L../dsp_fx
-CFLAGS=-Wall $(CCINCDIR) $(CCLIBDIR) -DDOS=1 -D__SUNOS__ -O3
+CFLAGS=-Wall $(CCINCDIR) $(CCLIBDIR) -DDOS=1 -O3
 LINTFILES= ${SRC:.c=.ln}
 #LINTFLAGS =  -hacbiu
 #LINTFLAGS =  -hacb

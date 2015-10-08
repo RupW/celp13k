@@ -52,7 +52,7 @@ such commitments.
 *******************************************************************/
 /* ratedec.c - selects encoding rate to use */
 
-
+#include <stdlib.h>
 #include <math.h>
 #include "celp.h"
 #include "coderate.h"
