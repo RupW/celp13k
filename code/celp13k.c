@@ -58,7 +58,9 @@ such commitments.
 #include <memory.h>
 #include <string.h>
 #include <sys/types.h>
+#ifndef _MSC_VER
 #include <sys/file.h>
+#endif
 #include <sys/stat.h>
 #include <math.h>
 #ifndef __SUNOS__
