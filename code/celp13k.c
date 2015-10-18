@@ -77,7 +77,7 @@ such commitments.
 */
 
 char *prog;
-char prog_desc[] = "\n\nCELP 13K coder - \nRevision Date: 03 Mar 2004\n";
+char prog_desc[] = "\n\nCELP 13K coder - 03 Mar 2004 plus QCP support\nhttps://github.com/RupW/celp13k";
 char *rates_str[NUMMODES] = {"BLANK", "EIGHTH", "QUARTER", "HALF", "FULL"};
 
 extern char     *trans_fname;
@@ -118,15 +118,13 @@ printf("\n%s: %s\n",prog, prog_desc);
 
 void print_welcome_message()
 {
-printf("\
-\n\
+printf("\n\
 ===============================================\n\
-       CDMA 13K Speech Coder TTY EDITION\n\
-               Ballot Version 1.0\n\
-               July 12, 1999\n\
+             CDMA 13K Speech Coder\n\
+         Ballot Version 1.0 (TTY edition)\n\
+             plus QCP format support\n\
 ===============================================\n\n\
 ");
-        
 }
 
 void print_farewell_message()
