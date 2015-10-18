@@ -159,6 +159,7 @@
     <ClCompile Include="hammtab.c" />
     <ClCompile Include="init.c" />
     <ClCompile Include="io.c" />
+    <ClCompile Include="io_qcp.c" />
     <ClCompile Include="log_10.c" />
     <ClCompile Include="lpc.c" />
     <ClCompile Include="lsp.c" />

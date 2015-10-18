@@ -436,13 +436,21 @@ int main( int argc, char *argv[] )
   frame_num = 0;
   fer_count = 0;
 
-  open_binary_input_file(&fin, fn_inspeech);
+  if (control.decode_only == YES)
+  {
+    open_qcp_input_file(&fin, fn_inspeech);
+  }
+  else
+  {
+    open_binary_input_file(&fin, fn_inspeech);
+  }
   open_binary_output_file(&fout, fn_outspeech);
 
 
   if( control.decode_only == YES )
   {
-      total_frames = GetNumFrames(fin,sizeof(short)*WORDS_PER_PACKET);
+      /*total_frames = GetNumFrames(fin,sizeof(short)*WORDS_PER_PACKET);*/
+      total_frames = get_qcp_packet_count();
   }
   else
   {
@@ -501,7 +509,9 @@ int main( int argc, char *argv[] )
 
     if (control.decode_only==YES)
     {
-        numread = read_packet(fin, packet.data, WORDS_PER_PACKET); 
+        numread = read_qcp_packet(fin, packet.data, WORDS_PER_PACKET);
+
+        /*
         if( numread != WORDS_PER_PACKET)
         {
             if(numread != 0)
@@ -511,6 +521,8 @@ int main( int argc, char *argv[] )
             }
             break;
         }
+        */
+        if (numread == 0) break;
     }
 
     if(control.encode_only==NO)

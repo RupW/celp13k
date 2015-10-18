@@ -26,6 +26,7 @@ SRC=\
 	frontfil.c\
 	hammtab.c\
 	io.c\
+        io_qcp.c\
 	init.c\
 	log_10.c\
 	lpc.c\
