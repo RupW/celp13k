@@ -75,6 +75,16 @@ such commitments.
 #define ONLY_UNWGHTED 1
 #define UNLIMITED  -1
 
+/* celp13k's own padded packet format */
+#define FORMAT_PACKET 0
+/* QCP, RFC 3625 */
+#define FORMAT_QCP 1
+
+/* signed 16-bit host-endian 8 KHz mono audio */
+#define FORMAT_RAW_AUDIO 0
+/* encoder state output for debugging - treat as raw */
+#define FORMAT_DEBUG_OUTPUT 0
+
 #define PRED 0
 #define VQT  1
 

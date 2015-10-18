@@ -268,6 +268,8 @@ struct CONTROL {
     int fractional_pitch;
     int skip_pitch_prefilter;
 
+    /* The format used for CELP files: packet or QCP */
+    int celp_file_format;
 };
 
 
@@ -998,4 +1000,20 @@ extern int read_qcp_packet(
     FILE  *fin,
     int   *inbuf,
     int   inbufmax
+);
+
+extern void open_qcp_output_file(
+    FILE **fout,
+    char *filename,
+    int frame_count
+);
+
+extern int write_qcp_packet(
+    FILE  *fout,
+    int   *outbuf,
+    int   outsamples
+);
+
+extern void finish_qcp_output_file(
+    FILE  *fout
 );

@@ -191,6 +191,7 @@ void parse_command_line(
   control->decode_only=NO;
   control->encode_only=NO;
   control->fractional_pitch=YES;
+  control->celp_file_format = FORMAT_QCP;
 
   /* TTY OPTIONS */
   fer_sim_seed = 0;
@@ -234,6 +235,10 @@ void parse_command_line(
   case 'p':
     control->pitch_out=YES;
     printf("Output file will contain output of pitch filter\n");
+    break;
+  case 'P':
+    control->celp_file_format = FORMAT_PACKET;
+    printf("Output file will use padded-packet format, not QCP\n");
     break;
   case 'k':
     control->print_packets=YES;
@@ -376,6 +381,8 @@ int main( int argc, char *argv[] )
   struct DECODER_MEM     decoder_memory;
   struct PACKET          packet;
   struct CONTROL         control;
+  int input_format;
+  int output_format;
 
 #if USE_CALLOC
   float *in_speech;
@@ -438,23 +445,64 @@ int main( int argc, char *argv[] )
 
   if (control.decode_only == YES)
   {
-    open_qcp_input_file(&fin, fn_inspeech);
-  }
-  else
-  {
-    open_binary_input_file(&fin, fn_inspeech);
-  }
-  open_binary_output_file(&fout, fn_outspeech);
-
-
-  if( control.decode_only == YES )
-  {
-      /*total_frames = GetNumFrames(fin,sizeof(short)*WORDS_PER_PACKET);*/
+    /* Input is a CELP file */
+    switch (control.celp_file_format)
+    {
+    case FORMAT_PACKET:
+      open_binary_input_file(&fin, fn_inspeech);
+      total_frames = GetNumFrames(fin, sizeof(short)*WORDS_PER_PACKET);
+      input_format = FORMAT_PACKET;
+      break;
+    case FORMAT_QCP:
+      open_qcp_input_file(&fin, fn_inspeech);
       total_frames = get_qcp_packet_count();
+      input_format = FORMAT_QCP;
+      break;
+    default:
+      fprintf(stderr, "unsupported decode_only input format %d\n", control.celp_file_format);
+      exit(-2);
+    }
   }
   else
   {
-      total_frames = GetNumFrames(fin,sizeof(short)*FSIZE);
+    /* Input is an audio file */
+    open_binary_input_file(&fin, fn_inspeech);
+    input_format = FORMAT_RAW_AUDIO;
+    total_frames = GetNumFrames(fin, sizeof(short)*FSIZE);
+  }
+
+  if ((control.form_res_out == YES)
+    || (control.form_res_out == YES)
+    || (control.form_res_out == YES)
+    || (control.form_res_out == YES))
+  {
+    /* Output is encoder state for debugging */
+    open_binary_output_file(&fout, fn_outspeech);
+    output_format = FORMAT_DEBUG_OUTPUT;
+  }
+  else if (control.encode_only == YES)
+  {
+    /* Output is a CELP file */
+    switch (control.celp_file_format)
+    {
+    case FORMAT_PACKET:
+      open_binary_output_file(&fout, fn_outspeech);
+      output_format = FORMAT_PACKET;
+      break;
+    case FORMAT_QCP:
+      open_qcp_output_file(&fout, fn_outspeech, total_frames);
+      output_format = FORMAT_QCP;
+      break;
+    default:
+      fprintf(stderr, "unsupported encode_only output format %d\n", control.celp_file_format);
+      exit(-2);
+    }
+  }
+  else
+  {
+    /* Output is an audio file */
+    open_binary_output_file(&fout, fn_outspeech);
+    output_format = FORMAT_RAW_AUDIO;
   }
 
   if(control.decode_only == NO)
@@ -509,9 +557,15 @@ int main( int argc, char *argv[] )
 
     if (control.decode_only==YES)
     {
+      if (input_format == FORMAT_QCP)
+      {
         numread = read_qcp_packet(fin, packet.data, WORDS_PER_PACKET);
-
-        /*
+        if (numread == 0) break;
+      }
+      else
+      {
+        /* FORMAT_PACKET */
+        numread = read_packet(fin, packet.data, WORDS_PER_PACKET);
         if( numread != WORDS_PER_PACKET)
         {
             if(numread != 0)
@@ -521,8 +575,7 @@ int main( int argc, char *argv[] )
             }
             break;
         }
-        */
-        if (numread == 0) break;
+      }
     }
 
     if(control.encode_only==NO)
@@ -554,7 +607,15 @@ int main( int argc, char *argv[] )
         {
             fer_count++;
         }
-        i = write_packet(fout, packet.data, WORDS_PER_PACKET);
+
+        if (output_format == FORMAT_QCP)
+        {
+            i = write_qcp_packet(fout, packet.data, WORDS_PER_PACKET);
+        }
+        else
+        {
+            i = write_packet(fout, packet.data, WORDS_PER_PACKET);
+        }
     }
 
 
@@ -570,6 +631,10 @@ int main( int argc, char *argv[] )
 
   } /* end main while() */
 
+  if (output_format == FORMAT_QCP)
+  {
+    finish_qcp_output_file(fout);
+  }
 
   fclose(fin);
   fclose(fout);
