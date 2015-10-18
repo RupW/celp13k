@@ -986,12 +986,16 @@ extern int write_packet(
     int   outsamples
 );
 
+/* io_qcp */
+extern void open_qcp_input_file(
+    FILE  **fin,
+    char *filename
+);
 
+extern int get_qcp_packet_count();
 
-
-
-
-
-
-
-
+extern int read_qcp_packet(
+    FILE  *fin,
+    int   *inbuf,
+    int   inbufmax
+);
