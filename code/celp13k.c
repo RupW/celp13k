@@ -468,9 +468,9 @@ int main( int argc, char *argv[] )
   }
 
   if ((control.form_res_out == YES)
-    || (control.form_res_out == YES)
-    || (control.form_res_out == YES)
-    || (control.form_res_out == YES))
+    || (control.target_after_out == YES)
+    || (control.cb_out == YES)
+    || (control.pitch_out == YES))
   {
     /* Output is encoder state for debugging */
     open_binary_output_file(&fout, fn_outspeech);

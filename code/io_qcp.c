@@ -420,6 +420,7 @@ void finish_qcp_output_file(
 {
   long length = ftell(fout);
 
+  /* The QCP "length" header contains the length immediately following the header, which is 4 bytes long. */
   if (qcp_out_offset_data_length > 0)
   {
     fseek(fout, qcp_out_offset_data_length, SEEK_SET);
@@ -427,10 +428,11 @@ void finish_qcp_output_file(
     fwrite(&data_length, 4, 1, fout);
   }
 
+  /* The RIFF "length" header contains the length immediately following the header, which is 4 bytes long. */
   if (qcp_out_offset_riff_length > 0)
   {
     fseek(fout, qcp_out_offset_riff_length, SEEK_SET);
-    int32_t riff_length = (length - (qcp_out_offset_riff_length + 8));
+    int32_t riff_length = (length - (qcp_out_offset_riff_length + 4));
     fwrite(&riff_length, 4, 1, fout);
   }
 }
